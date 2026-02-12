@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card setup-card">
+    <h2>Nieuw Spel Starten</h2>
+    <form action="{{ url_for('start_game') }}" method="POST">
+        <div class="player-inputs">
+            {% set default_names = ['Jan', 'Piet', 'Joris', 'Korneel'] %}
+            {% for name in default_names %}
+            <div class="input-group">
+                <label for="player_{{ loop.index }}">Speler {{ loop.index }}</label>
+                <input type="text" id="player_{{ loop.index }}" name="player_name" value="{{ name }}" required>
+            </div>
+            {% endfor %}
+            <div class="input-group">
+                <label for="player_5">Speler 5 (Optioneel)</label>
+                <input type="text" id="player_5" name="player_name" placeholder="Naam speler 5 (Optioneel)">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Start Spel</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,386 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="dashboard-grid">
+    <!-- Scoreboard Section -->
+    <section class="scoreboard-section">
+        <h2>Huidige Stand</h2>
+        <div class="player-cards">
+            {% for player in players %}
+            <div class="player-card {% if player.id == current_dealer_id %}dealer-card{% endif %}">
+                <div class="player-name">
+                    {{ player.name }}
+                    {% if player.id == current_sitter_id %}
+                    <span class="dealer-badge" style="background-color: var(--text-secondary);">Zit stil</span>
+                    {% elif player.id == current_dealer_id %}
+                    <span class="dealer-badge">Deler</span>
+                    {% endif %}
+                </div>
+                <div class="player-score">{{ scores[player.id] }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Actions Section -->
+    <section class="actions-section">
+        <button id="addRoundBtn" class="btn btn-primary btn-large">+ Nieuwe Ronde</button>
+        <form action="{{ url_for('end_game') }}" method="POST" class="inline-form">
+            <button type="submit" class="btn btn-danger btn-small"
+                onclick="return confirm('Weet je zeker dat je dit spel wilt beëindigen?')">Spel Beëindigen</button>
+        </form>
+    </section>
+
+    <!-- History Section -->
+    <section class="history-section">
+        <h3>Laatste Rondes</h3>
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Ronde</th>
+                    <th>Contract</th>
+                    <th>Resultaat</th>
+                    {% for player in players %}
+                    <th>{{ player.name }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for round in rounds %}
+                <tr>
+                    <td>#{{ round.round_number }}</td>
+                    <td>
+                        {{ round.contract_type }}
+                        {% if round.trump_suit %}
+                        {% if round.trump_suit in ['harten', 'ruiten'] %}
+                        <span class="suit-red">
+                            {% else %}
+                            <span class="suit-black">
+                                {% endif %}
+                                {% if round.trump_suit == 'harten' %}♥{% endif %}
+                                {% if round.trump_suit == 'ruiten' %}♦{% endif %}
+                                {% if round.trump_suit == 'klaveren' %}♣{% endif %}
+                                {% if round.trump_suit == 'schoppen' %}♠{% endif %}
+                            </span>
+                            {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge {{ round.result|lower }}">{{ round.result }}</span>
+                        {% if round.tricks %}({{ round.tricks }}){% endif %}
+                    </td>
+                    {% for player in players %}
+                    <td>
+                        {% if player.id == round.sitter_id %}
+                        <span class="score-neutral">-</span>
+                        {% else %}
+                        {% if player.id == round.dealer_id %}
+                        <span class="history-dealer-marker" title="Deler">D</span>
+                        {% endif %}
+                        {% set score = round.scores.get(player.id, 0) %}
+                        {% if score > 0 %}
+                        <span class="score-green">+{{ score }}</span>
+                        {% elif score < 0 %} <span class="score-red">{{ score }}</span>
+                            {% else %}
+                            <span class="score-neutral">0</span>
+                            {% endif %}
+                            {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
+
+<!-- Add Round Modal -->
+<div id="addRoundModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Ronde Toevoegen</h2>
+        <form action="{{ url_for('add_round') }}" method="POST">
+            <div class="form-group">
+                <label for="contract">Contract</label>
+                <select id="contract" name="contract" required
+                    oninvalid="this.setCustomValidity('Kies een contract uit de lijst')"
+                    oninput="this.setCustomValidity('')">
+                    <option value="Vraag">Vraag</option>
+                    <option value="Abondance">Abondance</option>
+                    <option value="Miserie">Miserie</option>
+                    <option value="Grote Miserie">Grote Miserie</option>
+                    <option value="Troel">Troel</option>
+                    <option value="Solo">Solo</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="trump-group">
+                <label>Troef</label>
+                <div class="radio-group">
+                    <label class="trump-label"><input type="radio" name="trump_suit" value="harten"
+                            oninvalid="this.setCustomValidity('Kies een troefkleur')" onclick="clearTrumpValidity()">
+                        <span class="suit-red">♥</span> Harten</label>
+                    <label class="trump-label"><input type="radio" name="trump_suit" value="ruiten"
+                            oninvalid="this.setCustomValidity('Kies een troefkleur')" onclick="clearTrumpValidity()">
+                        <span class="suit-red">♦</span> Ruiten</label>
+                    <label class="trump-label"><input type="radio" name="trump_suit" value="klaveren"
+                            oninvalid="this.setCustomValidity('Kies een troefkleur')" onclick="clearTrumpValidity()">
+                        <span class="suit-black">♣</span> Klaveren</label>
+                    <label class="trump-label"><input type="radio" name="trump_suit" value="schoppen"
+                            oninvalid="this.setCustomValidity('Kies een troefkleur')" onclick="clearTrumpValidity()">
+                        <span class="suit-black">♠</span> Schoppen</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="main_player">Speler (Indien van toepassing)</label>
+                <select id="main_player" name="main_player">
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="partner-group">
+                <label for="partner_id">Partner (Alleen bij Vraag)</label>
+                <select id="partner_id" name="partner_id"
+                    oninvalid="this.setCustomValidity('Selecteer een speler uit de lijst')"
+                    oninput="this.setCustomValidity('')">
+                    <option value="">Geen (Alleenspel)</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="miserie-group" style="display:none;">
+                <label>Spelers (Miserie / Grote Miserie)</label>
+                <div class="miserie-players">
+                    {% for player in players %}
+                    <div class="miserie-player-row" data-player-id="{{ player.id }}">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="miserie_play_{{ player.id }}" value="1"
+                                onchange="toggleMiserieResult(this, {{ player.id }})">
+                            {{ player.name }}
+                        </label>
+                        <div class="miserie-result-options" id="miserie-result-{{ player.id }}"
+                            style="display:none; margin-left: 10px;">
+                            <label><input type="radio" name="miserie_result_{{ player.id }}" value="Gewonnen" checked>
+                                Gewonnen</label>
+                            <label><input type="radio" name="miserie_result_{{ player.id }}" value="Verloren">
+                                Verloren</label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Resultaat</label>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="result" value="Gewonnen" checked> Gewonnen
+                    </label>
+                    <label>
+                        <input type="radio" name="result" value="Verloren"> Verloren
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="tricks">Extra Slagen / Details (Optioneel)</label>
+                <input type="number" id="tricks" name="tricks" value="0" placeholder="0">
+                <small>Bv. aantal overslagen bij Vraag</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary full-width">Opslaan</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Modal Logic
+    var modal = document.getElementById("addRoundModal");
+    var btn = document.getElementById("addRoundBtn");
+    var span = document.getElementsByClassName("close")[0];
+
+    btn.onclick = function () {
+        modal.style.display = "block";
+    }
+
+    span.onclick = function () {
+        modal.style.display = "none";
+    }
+
+    window.onclick = function (event) {
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    // Clear trump validity on all radio buttons when one is selected
+    function clearTrumpValidity() {
+        const trumpRadios = document.querySelectorAll('input[name="trump_suit"]');
+        trumpRadios.forEach(radio => radio.setCustomValidity(''));
+    }
+
+    // Dynamic Partner & Miserie Selection
+    const contractSelect = document.getElementById('contract');
+    const partnerGroup = document.getElementById('partner-group');
+    const miserieGroup = document.getElementById('miserie-group');
+    const mainPlayerGroup = document.querySelector('label[for="main_player"]').closest('.form-group');
+    const resultContainer = document.querySelector('.radio-group').closest('.form-group');
+
+    const partnerSelect = document.getElementById('partner_id');
+    const trumpGroup = document.getElementById('trump-group');
+
+    function updatePartnerVisibility() {
+        const val = contractSelect.value;
+
+        // Reset defaults
+        partnerGroup.style.display = 'none';
+        miserieGroup.style.display = 'none';
+        mainPlayerGroup.style.display = 'block';
+        resultContainer.style.display = 'block';
+        trumpGroup.style.display = 'none'; // Default hidden
+
+        if (val === 'Vraag' || val === 'Troel') {
+            partnerGroup.style.display = 'block';
+            trumpGroup.style.display = 'block'; // Show for Vraag/Troel
+            document.querySelector('label[for="partner_id"]').textContent = 'Partner';
+
+            // Troel: Force Partner (Hide "Geen")
+            // Vraag: Allow "Geen" (Alleenspel)
+            const noneOption = partnerSelect.querySelector('option[value=""]');
+            if (val === 'Troel') {
+                if (noneOption) noneOption.hidden = true;
+                partnerSelect.required = true;
+                if (partnerSelect.value === "") partnerSelect.value = "";
+            } else {
+                if (noneOption) noneOption.hidden = false;
+                partnerSelect.required = false;
+            }
+
+        }
+
+        if (val === 'Vraag' || val === 'Troel' || val === 'Abondance' || val === 'Solo') {
+            trumpGroup.style.display = 'block';
+            // Make trump selection mandatory
+            const trumpRadios = document.querySelectorAll('input[name="trump_suit"]');
+            trumpRadios.forEach(radio => radio.required = true);
+        } else {
+            // Not required for Miserie
+            const trumpRadios = document.querySelectorAll('input[name="trump_suit"]');
+            trumpRadios.forEach(radio => radio.required = false);
+        }
+
+        if (val === 'Miserie' || val === 'Grote Miserie') {
+            partnerGroup.style.display = 'none';
+            miserieGroup.style.display = 'block';
+            mainPlayerGroup.style.display = 'none';
+            resultContainer.style.display = 'none';
+            partnerSelect.value = '';
+
+            // Hide sitter in miserie rows
+            const sitterId = "{{ current_sitter_id }}";
+            if (sitterId && sitterId !== "None") {
+                const row = document.querySelector('.miserie-player-row[data-player-id="' + sitterId + '"]');
+                if (row) row.style.display = 'none';
+            }
+        } else {
+            partnerSelect.value = '';
+        }
+    }
+
+    window.toggleMiserieResult = function (checkbox, playerId) {
+        const resultDiv = document.getElementById('miserie-result-' + playerId);
+        resultDiv.style.display = checkbox.checked ? 'inline-block' : 'none';
+    }
+
+    // Initialize
+    updatePartnerVisibility();
+    contractSelect.addEventListener('change', updatePartnerVisibility);
+
+    // Prevent self-partner selection
+    const mainPlayerSelect = document.getElementById('main_player');
+    const tricksInput = document.getElementById('tricks');
+
+    function updatePartnerOptions() {
+        const selectedMainId = mainPlayerSelect.value;
+        const options = partnerSelect.options;
+        const sitterId = "{{ current_sitter_id }}";
+
+        for (let i = 0; i < options.length; i++) {
+            const opt = options[i];
+            // Skip empty option
+            if (opt.value === "") continue;
+
+            // Disable if main player OR sitter
+            if (opt.value === selectedMainId) {
+                opt.disabled = true;
+                if (partnerSelect.value === selectedMainId) {
+                    partnerSelect.value = ""; // Reset if current selection becomes invalid
+                }
+            } else if (opt.value === sitterId && sitterId !== "None") {
+                opt.disabled = true;
+            } else {
+                opt.disabled = false;
+            }
+        }
+    }
+
+    function updateTricksConstraint() {
+        const val = contractSelect.value;
+        const result = document.querySelector('input[name="result"]:checked').value;
+        let maxTricks = 5; // Default for Vraag/Troel Won
+
+        if (val === 'Abondance') {
+            maxTricks = (result === 'Gewonnen') ? 4 : 9;
+        } else if (val === 'Miserie' || val === 'Grote Miserie') {
+            maxTricks = 0;
+            tricksInput.value = 0;
+            tricksInput.disabled = true;
+        } else if (val === 'Solo') {
+            maxTricks = 0;
+            tricksInput.value = 0;
+            tricksInput.disabled = true;
+        } else {
+            // Vraag / Troel
+            maxTricks = (result === 'Gewonnen') ? 5 : 8;
+            tricksInput.disabled = false;
+        }
+
+        tricksInput.setAttribute('max', maxTricks);
+        tricksInput.placeholder = "0 - " + maxTricks;
+
+        // Ensure current value is valid
+        if (tricksInput.value && parseInt(tricksInput.value) > maxTricks) {
+            tricksInput.value = maxTricks;
+        }
+    }
+
+    mainPlayerSelect.addEventListener('change', updatePartnerOptions);
+    contractSelect.addEventListener('change', updateTricksConstraint);
+
+    // Add listeners to result radio buttons
+    const resultRadios = document.querySelectorAll('input[name="result"]');
+    resultRadios.forEach(radio => {
+        radio.addEventListener('change', updateTricksConstraint);
+    });
+
+    // Initial call to set state
+    updatePartnerOptions();
+    updateTricksConstraint();
+
+    // Hide Sitter in Selects
+    const sitterId = "{{ current_sitter_id }}";
+    if (sitterId && sitterId !== "None") {
+        const options = document.querySelectorAll('option[value="' + sitterId + '"]');
+        options.forEach(opt => {
+            opt.disabled = true;
+            opt.textContent += " (Zit stil)";
+        });
+    }
+
+    // Auto-remove main player from partner options? Optional enhancement.
+</script>
+{% endblock %}
