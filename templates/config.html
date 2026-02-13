@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="dashboard-grid">
+    <section class="config-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>Configuratie</h2>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">← Terug naar Setup</a>
+        </div>
+
+        <p style="color: var(--text-secondary); margin-bottom: 30px;">
+            Pas de puntenwaardes en limieten aan voor het volgende spel. Deze instellingen worden toegepast wanneer je
+            een nieuw spel start.
+        </p>
+
+        <form action="{{ url_for('update_config') }}" method="POST">
+            <!-- Contract Punten -->
+            <div class="config-group">
+                <h3>Contract Punten</h3>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="vraag_partner_points">Vraag met partner (2 tegen 2)</label>
+                        <input type="number" id="vraag_partner_points" name="vraag_partner_points"
+                            value="{{ config.vraag_partner_points }}" min="0" required>
+                    </div>
+
+                    <div class="config-item">
+                        <label for="vraag_solo_points">Vraag alleen (1 tegen 3)</label>
+                        <input type="number" id="vraag_solo_points" name="vraag_solo_points"
+                            value="{{ config.vraag_solo_points }}" min="0" required>
+                    </div>
+
+                    <div class="config-item">
+                        <label for="troel_points">Troel</label>
+                        <input type="number" id="troel_points" name="troel_points" value="{{ config.troel_points }}"
+                            min="0" required>
+                    </div>
+
+                    <div class="config-item">
+                        <label for="abondance_points">Abondance</label>
+                        <input type="number" id="abondance_points" name="abondance_points"
+                            value="{{ config.abondance_points }}" min="0" required>
+                    </div>
+
+                    <div class="config-item">
+                        <label for="solo_points">Solo</label>
+                        <input type="number" id="solo_points" name="solo_points" value="{{ config.solo_points }}"
+                            min="0" required>
+                    </div>
+
+                    <div class="config-item">
+                        <label for="miserie_points">Miserie</label>
+                        <input type="number" id="miserie_points" name="miserie_points"
+                            value="{{ config.miserie_points }}" min="0" required>
+                    </div>
+
+                    <div class="config-item">
+                        <label for="grote_miserie_points">Grote Miserie</label>
+                        <input type="number" id="grote_miserie_points" name="grote_miserie_points"
+                            value="{{ config.grote_miserie_points }}" min="0" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Extra Slagen Limieten -->
+            <div class="config-group">
+                <h3>Extra Slagen Limieten</h3>
+
+                <h4>Vraag met partner</h4>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="vraag_partner_tricks_won_max">Gewonnen (max)</label>
+                        <input type="number" id="vraag_partner_tricks_won_max" name="vraag_partner_tricks_won_max"
+                            value="{{ config.vraag_partner_tricks_won_max }}" min="0" required>
+                    </div>
+                    <div class="config-item">
+                        <label for="vraag_partner_tricks_lost_max">Verloren (max)</label>
+                        <input type="number" id="vraag_partner_tricks_lost_max" name="vraag_partner_tricks_lost_max"
+                            value="{{ config.vraag_partner_tricks_lost_max }}" min="0" required>
+                    </div>
+                </div>
+
+                <h4>Vraag alleen</h4>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="vraag_solo_tricks_won_max">Gewonnen (max)</label>
+                        <input type="number" id="vraag_solo_tricks_won_max" name="vraag_solo_tricks_won_max"
+                            value="{{ config.vraag_solo_tricks_won_max }}" min="0" required>
+                    </div>
+                    <div class="config-item">
+                        <label for="vraag_solo_tricks_lost_max">Verloren (max)</label>
+                        <input type="number" id="vraag_solo_tricks_lost_max" name="vraag_solo_tricks_lost_max"
+                            value="{{ config.vraag_solo_tricks_lost_max }}" min="0" required>
+                    </div>
+                </div>
+
+                <h4>Troel</h4>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="troel_tricks_won_max">Gewonnen (max)</label>
+                        <input type="number" id="troel_tricks_won_max" name="troel_tricks_won_max"
+                            value="{{ config.troel_tricks_won_max }}" min="0" required>
+                    </div>
+                    <div class="config-item">
+                        <label for="troel_tricks_lost_max">Verloren (max)</label>
+                        <input type="number" id="troel_tricks_lost_max" name="troel_tricks_lost_max"
+                            value="{{ config.troel_tricks_lost_max }}" min="0" required>
+                    </div>
+                </div>
+
+                <h4>Abondance</h4>
+                <div class="config-grid">
+                    <div class="config-item">
+                        <label for="abondance_tricks_won_max">Gewonnen (max)</label>
+                        <input type="number" id="abondance_tricks_won_max" name="abondance_tricks_won_max"
+                            value="{{ config.abondance_tricks_won_max }}" min="0" required>
+                    </div>
+                    <div class="config-item">
+                        <label for="abondance_tricks_lost_max">Verloren (max)</label>
+                        <input type="number" id="abondance_tricks_lost_max" name="abondance_tricks_lost_max"
+                            value="{{ config.abondance_tricks_lost_max }}" min="0" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 10px; margin-top: 30px;">
+                <button type="submit" class="btn btn-primary">Opslaan</button>
+                <button type="button" class="btn btn-warning" onclick="confirmReset()">Reset naar Standaard</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<script>
+    function confirmReset() {
+        if (confirm('Weet je zeker dat je alle instellingen wilt resetten naar de standaardwaarden?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ url_for("reset_config") }}';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+</script>
+
+<style>
+    .config-section {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .config-group {
+        margin-bottom: 40px;
+    }
+
+    .config-group h3 {
+        color: var(--accent-color);
+        margin-bottom: 20px;
+        font-size: 1.3em;
+        border-bottom: 2px solid var(--accent-color);
+        padding-bottom: 10px;
+    }
+
+    .config-group h4 {
+        color: var(--text-secondary);
+        margin: 20px 0 15px 0;
+        font-size: 1.1em;
+    }
+
+    .config-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 15px;
+    }
+
+    .config-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .config-item label {
+        color: var(--text-primary);
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .config-item input {
+        background: var(--bg-color);
+        border: 1px solid #444;
+        color: var(--text-primary);
+        padding: 10px;
+        border-radius: 6px;
+        font-size: 1em;
+        transition: border-color 0.3s;
+    }
+
+    .config-item input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+    }
+
+    .config-item input:hover {
+        border-color: #666;
+    }
+</style>
+{% endblock %}

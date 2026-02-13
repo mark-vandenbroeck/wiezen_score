@@ -3,6 +3,12 @@
 {% block content %}
 <div class="card setup-card">
     <h2>Nieuw Spel Starten</h2>
+
+    <div class="info-box">
+        <p>⚙️ <strong>Configuratie:</strong> Wil je de puntenwaardes aanpassen? <a href="{{ url_for('config') }}"
+                class="inline-link">Klik hier om de configuratie in te stellen</a> voordat je het spel start. Na het
+            starten kan de configuratie niet meer gewijzigd worden.</p>
+    </div>
     <form action="{{ url_for('start_game') }}" method="POST">
         <div class="player-inputs">
             {% set default_names = ['Jan', 'Piet', 'Joris', 'Korneel'] %}
@@ -17,7 +23,7 @@
                 <input type="text" id="player_5" name="player_name" placeholder="Naam speler 5 (Optioneel)">
             </div>
         </div>
-        <button type="submit" class="btn btn-primary">Start Spel</button>
+        <button type="submit" class="btn btn-primary btn-large">Start Spel</button>
     </form>
 </div>
 {% endblock %}

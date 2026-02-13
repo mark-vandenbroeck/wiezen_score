@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
-from models import db, Game, Player, Round, Score
+from models import db, Game, Player, Round, Score, ContractConfig
 import os
 
 app = Flask(__name__)
@@ -7,6 +7,7 @@ app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'wiezen.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 db.init_app(app)
 
@@ -32,12 +33,72 @@ def ensure_db_exists():
 with app.app_context():
     db.create_all()
 
+def get_contract_config(game_id):
+    """Get contract config for game, with fallback to defaults for backwards compatibility."""
+    config = ContractConfig.query.filter_by(game_id=game_id).first()
+    if not config:
+        # Return object with default values for backwards compatibility
+        class DefaultConfig:
+            vraag_partner_points = 2
+            vraag_solo_points = 2
+            troel_points = 2
+            abondance_points = 5
+            solo_points = 13
+            miserie_points = 10
+            grote_miserie_points = 20
+            vraag_partner_tricks_won_max = 5
+            vraag_partner_tricks_lost_max = 8
+            vraag_solo_tricks_won_max = 5
+            vraag_solo_tricks_lost_max = 8
+            troel_tricks_won_max = 5
+            troel_tricks_lost_max = 8
+            abondance_tricks_won_max = 4
+            abondance_tricks_lost_max = 9
+        return DefaultConfig()
+    return config
+
+def get_contract_points(config, contract_type, has_partner=False):
+    """Get points for a specific contract type."""
+    if contract_type == 'Vraag':
+        return config.vraag_partner_points if has_partner else config.vraag_solo_points
+    elif contract_type == 'Troel':
+        return config.troel_points
+    elif contract_type == 'Abondance':
+        return config.abondance_points
+    elif contract_type == 'Solo':
+        return config.solo_points
+    elif contract_type == 'Miserie':
+        return config.miserie_points
+    elif contract_type == 'Grote Miserie':
+        return config.grote_miserie_points
+    return 0
+
+def get_trick_limits(config, contract_type, result, has_partner=False):
+    """Get trick limits for a specific contract type and result."""
+    if contract_type == 'Vraag':
+        if has_partner:
+            return config.vraag_partner_tricks_won_max if result == 'Gewonnen' else config.vraag_partner_tricks_lost_max
+        else:
+            return config.vraag_solo_tricks_won_max if result == 'Gewonnen' else config.vraag_solo_tricks_lost_max
+    elif contract_type == 'Troel':
+        return config.troel_tricks_won_max if result == 'Gewonnen' else config.troel_tricks_lost_max
+    elif contract_type == 'Abondance':
+        return config.abondance_tricks_won_max if result == 'Gewonnen' else config.abondance_tricks_lost_max
+    return 0
+
 @app.route('/')
 def index():
     # Check if there is an active game
     active_game = Game.query.filter_by(is_active=True).first()
     if active_game:
         players = sorted(active_game.players, key=lambda p: p.id)
+        
+        # Safety check: if no players, redirect to setup
+        if not players:
+            active_game.is_active = False
+            db.session.commit()
+            return render_template('setup.html')
+        
         # Get latest scores for each player
         current_scores = {}
         for player in players:
@@ -63,7 +124,9 @@ def index():
             round_dealer_id = players[round_dealer_index].id # Assuming players order is static/sorted by ID
             round_sitter_id = round_dealer_id if num_players == 5 else None
             
+            
             round_data = {
+                'id': r.id,
                 'round_number': r.round_number,
                 'contract_type': r.contract_type,
                 'result': r.result,
@@ -101,6 +164,38 @@ def start_game():
     db.session.add(new_game)
     db.session.commit()
     
+    # Create contract configuration for this game
+    # Check if there's a pending config in session
+    from flask import session
+    pending_config = session.pop('pending_config', None)
+    
+    if pending_config:
+        # Apply the pending configuration
+        game_config = ContractConfig(
+            game_id=new_game.id,
+            vraag_partner_points=pending_config.get('vraag_partner_points', 2),
+            vraag_solo_points=pending_config.get('vraag_solo_points', 2),
+            troel_points=pending_config.get('troel_points', 2),
+            abondance_points=pending_config.get('abondance_points', 5),
+            solo_points=pending_config.get('solo_points', 13),
+            miserie_points=pending_config.get('miserie_points', 10),
+            grote_miserie_points=pending_config.get('grote_miserie_points', 20),
+            vraag_partner_tricks_won_max=pending_config.get('vraag_partner_tricks_won_max', 5),
+            vraag_partner_tricks_lost_max=pending_config.get('vraag_partner_tricks_lost_max', 8),
+            vraag_solo_tricks_won_max=pending_config.get('vraag_solo_tricks_won_max', 5),
+            vraag_solo_tricks_lost_max=pending_config.get('vraag_solo_tricks_lost_max', 8),
+            troel_tricks_won_max=pending_config.get('troel_tricks_won_max', 5),
+            troel_tricks_lost_max=pending_config.get('troel_tricks_lost_max', 8),
+            abondance_tricks_won_max=pending_config.get('abondance_tricks_won_max', 4),
+            abondance_tricks_lost_max=pending_config.get('abondance_tricks_lost_max', 9)
+        )
+    else:
+        # Use default configuration
+        game_config = ContractConfig(game_id=new_game.id)
+    
+    db.session.add(game_config)
+    db.session.commit()
+    
     for name in player_names:
         player = Player(name=name, game_id=new_game.id)
         db.session.add(player)
@@ -135,14 +230,18 @@ def add_round():
     # Validation: Partner cannot be Main Player
     if partner_id and partner_id == main_player_id:
         return "Error: Speler en partner mogen niet dezelfde persoon zijn.", 400
-    # Validation: Extra Tricks Limit
+    # Get contract configuration for this game
+    config = get_contract_config(active_game.id)
+    has_partner = bool(partner_id)
+    
+    # Validation: Extra Tricks Limit (using configurable limits)
     if contract in ['Vraag', 'Troel']:
-        limit = 5 if result == 'Gewonnen' else 8
+        limit = get_trick_limits(config, contract, result, has_partner)
         if tricks > limit:
              return f"Error: Maximaal {limit} extra slagen bij {contract} ({result}).", 400
     
     if contract == 'Abondance':
-        limit = 4 if result == 'Gewonnen' else 9
+        limit = get_trick_limits(config, contract, result)
         if tricks > limit:
             return f"Error: Maximaal {limit} extra slagen bij Abondance ({result}).", 400
 
@@ -159,19 +258,8 @@ def add_round():
     if contract in ['Vraag', 'Troel', 'Abondance', 'Solo'] and not trump_suit:
         return "Error: Kies een troefkleur (Harten, Ruiten, Klaveren of Schoppen).", 400
 
-    base_points = 0
-    if contract == 'Vraag':
-        base_points = 2
-    elif contract == 'Troel':
-        base_points = 2
-    elif contract == 'Abondance':
-        base_points = 5
-    elif contract == 'Miserie':
-        base_points = 10
-    elif contract == 'Grote Miserie':
-        base_points = 20
-    elif contract == 'Solo':
-        base_points = 13
+    # Get base points from configuration (supports Vraag with/without partner)
+    base_points = get_contract_points(config, contract, has_partner)
     
     points = base_points + tricks # Simplified
     
@@ -216,8 +304,11 @@ def add_round():
     score_changes = {p.id: 0 for p in players}
 
     if contract in ['Miserie', 'Grote Miserie']:
-        # Base value
-        base_val = 20 if contract == 'Grote Miserie' else 10
+        # Use configurable base value
+        base_val = get_contract_points(config, contract)
+        
+        # Store participant data for future recalculation
+        participants_data = {}
         
         # Check for each player if they played
         for player in players:
@@ -229,6 +320,8 @@ def add_round():
             # and name="miserie_result_{player.id}" (value 'Gewonnen' or 'Verloren')
             if request.form.get(f'miserie_play_{player.id}'):
                 p_result = request.form.get(f'miserie_result_{player.id}')
+                participants_data[str(player.id)] = p_result
+                
                 p_points = base_val # Fixed points for Miserie
                 
                 if p_result == 'Gewonnen':
@@ -252,6 +345,11 @@ def add_round():
                     for opponent in players:
                         if opponent.id != player.id and opponent.id != sitter_id:
                             score_changes[opponent.id] += p_points
+        
+        # Store participant data in round for recalculation
+        import json
+        new_round.miserie_participants = json.dumps(participants_data)
+        db.session.commit()
 
     else: # Standard contracts
         for player in players:
@@ -293,6 +391,254 @@ def add_round():
     
     return redirect(url_for('index'))
 
+def recalculate_scores_from_round(game_id, start_round_number=1):
+    """
+    Recalculate all scores starting from a specific round number.
+    This is used after editing or deleting rounds to ensure score integrity.
+    """
+    game = Game.query.get(game_id)
+    if not game:
+        return
+    
+    players = sorted(game.players, key=lambda p: p.id)
+    
+    # Delete all scores for rounds >= start_round_number
+    rounds_to_recalc = Round.query.filter(
+        Round.game_id == game_id,
+        Round.round_number >= start_round_number
+    ).order_by(Round.round_number).all()
+    
+    for round_obj in rounds_to_recalc:
+        Score.query.filter_by(round_id=round_obj.id).delete()
+    
+    # Get baseline scores from previous round
+    baseline_scores = {}
+    if start_round_number > 1:
+        prev_round = Round.query.filter(
+            Round.game_id == game_id,
+            Round.round_number == start_round_number - 1
+        ).first()
+        if prev_round:
+            for score in prev_round.scores:
+                baseline_scores[score.player_id] = score.current_total
+    
+    # If no baseline, start from 0
+    for player in players:
+        if player.id not in baseline_scores:
+            baseline_scores[player.id] = 0
+    
+    # Recalculate scores for each round
+    for round_obj in rounds_to_recalc:
+        calculate_and_save_scores(round_obj, players, baseline_scores)
+    
+    db.session.commit()
+
+def calculate_and_save_scores(round_obj, players, baseline_scores):
+    """Calculate and save scores for a specific round."""
+    num_players = len(players)
+    sitter_id = round_obj.sitter_id
+    
+    # Calculate score changes based on contract type
+    score_changes = {p.id: 0 for p in players}
+    
+    contract = round_obj.contract_type
+    result = round_obj.result
+    tricks = round_obj.tricks or 0
+    main_player_id = str(round_obj.main_player_id) if round_obj.main_player_id else None
+    partner_id = str(round_obj.partner_id) if round_obj.partner_id else None
+    
+    # Get contract configuration for this game
+    config = get_contract_config(round_obj.game_id)
+    has_partner = bool(partner_id)
+    
+    # Calculate base points using configuration
+    base_points = get_contract_points(config, contract, has_partner)
+    
+    points = base_points + tricks
+    total_change = points if result == 'Gewonnen' else -points
+    
+    if contract in ['Miserie', 'Grote Miserie']:
+        # Use stored participant data if available
+        if round_obj.miserie_participants:
+            import json
+            participants_data = json.loads(round_obj.miserie_participants)
+            # Use configurable points for Miserie
+            base_val = get_contract_points(config, contract)
+            
+            # Recalculate scores based on stored participant data
+            for player_id_str, p_result in participants_data.items():
+                player_id = int(player_id_str)
+                p_points = base_val
+                
+                if p_result == 'Gewonnen':
+                    # Player wins: receives base_val from each opponent
+                    num_active = num_players - (1 if sitter_id else 0)
+                    win_amount = p_points * (num_active - 1)
+                    
+                    score_changes[player_id] += win_amount
+                    # Each opponent loses p_points
+                    for player in players:
+                        if player.id != player_id and player.id != sitter_id:
+                            score_changes[player.id] -= p_points
+                else:  # Verloren
+                    # Player loses: pays base_val to each opponent
+                    num_active = num_players - (1 if sitter_id else 0)
+                    loss_amount = p_points * (num_active - 1)
+                    
+                    score_changes[player_id] -= loss_amount
+                    # Each opponent wins p_points
+                    for player in players:
+                        if player.id != player_id and player.id != sitter_id:
+                            score_changes[player.id] += p_points
+        else:
+            # Fallback for old rounds without participant data
+            # Set all scores to 0 - cannot recalculate without data
+            pass
+    else:
+        for player in players:
+            change = 0
+            is_sitter = (player.id == sitter_id)
+            
+            if is_sitter:
+                change = 0
+            else:
+                is_main = str(player.id) == main_player_id
+                is_partner = str(player.id) == partner_id if partner_id else False
+                
+                if partner_id:
+                    if is_main or is_partner:
+                        change = total_change
+                    else:
+                        change = -total_change
+                else:  # 1 vs 3
+                    if is_main:
+                        change = total_change * 3
+                    else:
+                        change = -total_change
+            score_changes[player.id] = change
+    
+    # Save scores
+    for player in players:
+        change = score_changes[player.id]
+        current_total = baseline_scores.get(player.id, 0) + change
+        
+        new_score = Score(
+            round_id=round_obj.id,
+            player_id=player.id,
+            points_change=change,
+            current_total=current_total
+        )
+        db.session.add(new_score)
+        baseline_scores[player.id] = current_total
+
+@app.route('/round/undo', methods=['POST'])
+def undo_round():
+    """Undo (delete) the last round."""
+    active_game = Game.query.filter_by(is_active=True).first()
+    if not active_game:
+        return redirect(url_for('index'))
+    
+    # Get the last round
+    last_round = Round.query.filter_by(game_id=active_game.id).order_by(Round.round_number.desc()).first()
+    if not last_round:
+        return redirect(url_for('index'))
+    
+    # Delete scores for this round
+    Score.query.filter_by(round_id=last_round.id).delete()
+    
+    # Delete the round
+    db.session.delete(last_round)
+    db.session.commit()
+    
+    return redirect(url_for('index'))
+
+@app.route('/round/delete/<int:round_id>', methods=['POST'])
+def delete_round(round_id):
+    """Delete a specific round and recalculate all subsequent scores."""
+    round_obj = Round.query.get(round_id)
+    if not round_obj:
+        return redirect(url_for('index'))
+    
+    active_game = Game.query.filter_by(is_active=True).first()
+    if not active_game or round_obj.game_id != active_game.id:
+        return redirect(url_for('index'))
+    
+    deleted_round_number = round_obj.round_number
+    
+    # Delete scores for this round
+    Score.query.filter_by(round_id=round_obj.id).delete()
+    
+    # Delete the round
+    db.session.delete(round_obj)
+    db.session.commit()
+    
+    # Renumber subsequent rounds
+    subsequent_rounds = Round.query.filter(
+        Round.game_id == active_game.id,
+        Round.round_number > deleted_round_number
+    ).order_by(Round.round_number).all()
+    
+    for r in subsequent_rounds:
+        r.round_number -= 1
+    
+    db.session.commit()
+    
+    # Recalculate scores from the deleted round onwards
+    recalculate_scores_from_round(active_game.id, deleted_round_number)
+    
+    return redirect(url_for('index'))
+
+@app.route('/round/edit/<int:round_id>', methods=['GET'])
+def edit_round(round_id):
+    """Display edit form for a specific round."""
+    round_obj = Round.query.get(round_id)
+    if not round_obj:
+        return redirect(url_for('index'))
+    
+    active_game = Game.query.filter_by(is_active=True).first()
+    if not active_game or round_obj.game_id != active_game.id:
+        return redirect(url_for('index'))
+    
+    players = sorted(active_game.players, key=lambda p: p.id)
+    
+    # Return JSON for AJAX or render template
+    return jsonify({
+        'id': round_obj.id,
+        'round_number': round_obj.round_number,
+        'contract': round_obj.contract_type,
+        'main_player_id': round_obj.main_player_id,
+        'partner_id': round_obj.partner_id,
+        'result': round_obj.result,
+        'trump_suit': round_obj.trump_suit,
+        'tricks': round_obj.tricks
+    })
+
+@app.route('/round/update/<int:round_id>', methods=['POST'])
+def update_round(round_id):
+    """Update an existing round and recalculate scores."""
+    round_obj = Round.query.get(round_id)
+    if not round_obj:
+        return redirect(url_for('index'))
+    
+    active_game = Game.query.filter_by(is_active=True).first()
+    if not active_game or round_obj.game_id != active_game.id:
+        return redirect(url_for('index'))
+    
+    # Update round data
+    round_obj.contract_type = request.form.get('contract')
+    round_obj.main_player_id = request.form.get('main_player')
+    round_obj.partner_id = request.form.get('partner_id') if request.form.get('partner_id') else None
+    round_obj.result = request.form.get('result')
+    round_obj.tricks = int(request.form.get('tricks', 0))
+    round_obj.trump_suit = request.form.get('trump_suit') if round_obj.contract_type in ['Vraag', 'Abondance', 'Troel', 'Solo'] else None
+    
+    db.session.commit()
+    
+    # Recalculate scores from this round onwards
+    recalculate_scores_from_round(active_game.id, round_obj.round_number)
+    
+    return redirect(url_for('index'))
+
 @app.route('/game/end', methods=['POST'])
 def end_game():
     active_game = Game.query.filter_by(is_active=True).first()
@@ -301,5 +647,95 @@ def end_game():
         db.session.commit()
     return redirect(url_for('index'))
 
+@app.route('/config')
+def config():
+    """Display configuration page for contract points - only accessible before game starts."""
+    active_game = Game.query.filter_by(is_active=True).first()
+    
+    # Config is only accessible when there's NO active game
+    if active_game:
+        return redirect(url_for('index'))
+    
+    # Get the most recent game to use its config, or create a new default config
+    latest_game = Game.query.order_by(Game.id.desc()).first()
+    
+    if latest_game and latest_game.config:
+        game_config = latest_game.config
+    else:
+        # Create a temporary config object with defaults for display
+        class TempConfig:
+            vraag_partner_points = 2
+            vraag_solo_points = 2
+            troel_points = 2
+            abondance_points = 5
+            solo_points = 13
+            miserie_points = 10
+            grote_miserie_points = 20
+            vraag_partner_tricks_won_max = 5
+            vraag_partner_tricks_lost_max = 8
+            vraag_solo_tricks_won_max = 5
+            vraag_solo_tricks_lost_max = 8
+            troel_tricks_won_max = 5
+            troel_tricks_lost_max = 8
+            abondance_tricks_won_max = 4
+            abondance_tricks_lost_max = 9
+        game_config = TempConfig()
+    
+    return render_template('config.html', config=game_config, game=None)
+
+@app.route('/config/update', methods=['POST'])
+def update_config():
+    """Update contract configuration - saves to session for next game."""
+    active_game = Game.query.filter_by(is_active=True).first()
+    
+    # Prevent config changes during active game
+    if active_game:
+        return "Error: Configuratie kan niet gewijzigd worden tijdens een actief spel.", 403
+    
+    # Store config values in session to apply to next game
+    try:
+        from flask import session
+        session['pending_config'] = {
+            'vraag_partner_points': int(request.form.get('vraag_partner_points', 2)),
+            'vraag_solo_points': int(request.form.get('vraag_solo_points', 2)),
+            'troel_points': int(request.form.get('troel_points', 2)),
+            'abondance_points': int(request.form.get('abondance_points', 5)),
+            'solo_points': int(request.form.get('solo_points', 13)),
+            'miserie_points': int(request.form.get('miserie_points', 10)),
+            'grote_miserie_points': int(request.form.get('grote_miserie_points', 20)),
+            'vraag_partner_tricks_won_max': int(request.form.get('vraag_partner_tricks_won_max', 5)),
+            'vraag_partner_tricks_lost_max': int(request.form.get('vraag_partner_tricks_lost_max', 8)),
+            'vraag_solo_tricks_won_max': int(request.form.get('vraag_solo_tricks_won_max', 5)),
+            'vraag_solo_tricks_lost_max': int(request.form.get('vraag_solo_tricks_lost_max', 8)),
+            'troel_tricks_won_max': int(request.form.get('troel_tricks_won_max', 5)),
+            'troel_tricks_lost_max': int(request.form.get('troel_tricks_lost_max', 8)),
+            'abondance_tricks_won_max': int(request.form.get('abondance_tricks_won_max', 4)),
+            'abondance_tricks_lost_max': int(request.form.get('abondance_tricks_lost_max', 9))
+        }
+        
+        # Validate all values are positive
+        for key, value in session['pending_config'].items():
+            if value < 0:
+                return "Error: Alle waarden moeten positief zijn.", 400
+        
+        return redirect(url_for('index'))
+    except ValueError:
+        return "Error: Ongeldige invoer. Gebruik alleen gehele getallen.", 400
+
+@app.route('/config/reset', methods=['POST'])
+def reset_config():
+    """Reset configuration to default values."""
+    active_game = Game.query.filter_by(is_active=True).first()
+    
+    # Prevent config changes during active game
+    if active_game:
+        return "Error: Configuratie kan niet gewijzigd worden tijdens een actief spel.", 403
+    
+    # Clear pending config from session
+    from flask import session
+    session.pop('pending_config', None)
+    
+    return redirect(url_for('config'))
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8080)

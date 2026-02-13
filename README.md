@@ -11,14 +11,21 @@ Een moderne, web-gebaseerde score tracker voor het kaartspel **Wiezen**, gebouwd
 - **Automatische dealer rotatie**: De dealer roteert automatisch na elke ronde
 - **Zit-stil functie**: Bij 5 spelers zit de dealer automatisch stil
 
+### Configureerbare Spelregels ⚙️
+- **Aanpasbare contractpunten**: Stel de puntenwaardes voor elk contract in volgens jouw regionale variant
+- **Vraag met/zonder partner**: Aparte configuratie voor Vraag met partner (2v2) en Vraag alleen (1v3)
+- **Extra slagen limieten**: Configureer de maximale extra slagen per contract
+- **Pre-game configuratie**: Configuratie wordt ingesteld vóór het spel en blijft locked tijdens het spel
+- **Per-game opslag**: Elk spel behoudt zijn eigen configuratie voor consistente score berekening
+
 ### Contracten
 De applicatie ondersteunt alle standaard Wiezen contracten:
-- **Vraag** (2 punten + extra slagen)
-- **Troel** (2 punten + extra slagen, partner verplicht)
-- **Abondance** (5 punten + extra slagen)
-- **Solo** (13 punten)
-- **Miserie** (10 punten)
-- **Grote Miserie** (20 punten)
+- **Vraag** (standaard 2 punten + extra slagen, configureerbaar)
+- **Troel** (standaard 2 punten + extra slagen, partner verplicht, configureerbaar)
+- **Abondance** (standaard 5 punten + extra slagen, configureerbaar)
+- **Solo** (standaard 13 punten, configureerbaar)
+- **Miserie** (standaard 10 punten, configureerbaar)
+- **Grote Miserie** (standaard 20 punten, configureerbaar)
 - **Multi-player Miserie**: Meerdere spelers kunnen tegelijk Miserie spelen
 
 ### Troefkeuze
@@ -68,10 +75,26 @@ De applicatie ondersteunt alle standaard Wiezen contracten:
 
 4. **Open in browser**
    ```
-   http://localhost:5000
+   http://localhost:8080
    ```
 
 ## 📖 Gebruik
+
+### Configuratie instellen (optioneel)
+
+Voordat je een spel start, kun je de puntenwaardes aanpassen voor regionale varianten:
+
+1. Ga naar de setup pagina
+2. Klik op de link "configuratie pagina" in de info box
+3. Pas de gewenste puntenwaardes aan:
+   - Vraag met partner (standaard: 2)
+   - Vraag alleen (standaard: 2)
+   - Troel, Abondance, Solo, Miserie, Grote Miserie
+4. Pas eventueel de limieten voor extra slagen aan
+5. Klik op "Opslaan"
+6. Start het spel - de configuratie wordt toegepast
+
+**Let op**: De configuratie kan alleen vóór het starten van een spel worden aangepast. Tijdens het spel is de configuratie locked om consistente score berekening te garanderen.
 
 ### Een nieuw spel starten
 
@@ -160,14 +183,17 @@ Wiezen_score/
 ├── app.py                 # Flask applicatie & routes
 ├── models.py              # Database modellen (SQLAlchemy)
 ├── test_app.py           # Unit tests
+├── test_config.py        # Config feature tests
 ├── requirements.txt       # Python dependencies
 ├── wiezen.db             # SQLite database (auto-generated)
 ├── static/
+│   ├── favicon.svg       # App favicon
 │   └── css/
 │       └── style.css     # Styling
 └── templates/
     ├── base.html         # Base template
     ├── setup.html        # Game setup pagina
+    ├── config.html       # Configuratie pagina
     └── index.html        # Main game interface
 ```
 
@@ -177,6 +203,25 @@ Wiezen_score/
 - `id`: Primary key
 - `date`: Aanmaakdatum
 - `is_active`: Boolean voor actief spel
+
+**ContractConfig** ⚙️
+- `id`: Primary key
+- `game_id`: Foreign key naar Game (unique)
+- `vraag_partner_points`: Punten voor Vraag met partner
+- `vraag_solo_points`: Punten voor Vraag alleen
+- `troel_points`: Punten voor Troel
+- `abondance_points`: Punten voor Abondance
+- `solo_points`: Punten voor Solo
+- `miserie_points`: Punten voor Miserie
+- `grote_miserie_points`: Punten voor Grote Miserie
+- `vraag_partner_tricks_won_max`: Max extra slagen Vraag partner gewonnen
+- `vraag_partner_tricks_lost_max`: Max extra slagen Vraag partner verloren
+- `vraag_solo_tricks_won_max`: Max extra slagen Vraag solo gewonnen
+- `vraag_solo_tricks_lost_max`: Max extra slagen Vraag solo verloren
+- `troel_tricks_won_max`: Max extra slagen Troel gewonnen
+- `troel_tricks_lost_max`: Max extra slagen Troel verloren
+- `abondance_tricks_won_max`: Max extra slagen Abondance gewonnen
+- `abondance_tricks_lost_max`: Max extra slagen Abondance verloren
 
 **Player**
 - `id`: Primary key
@@ -195,6 +240,7 @@ Wiezen_score/
 - `sitter_id`: Foreign key naar Player (optioneel)
 - `main_player_id`: Foreign key naar Player
 - `partner_id`: Foreign key naar Player (optioneel)
+- `miserie_participants`: JSON data voor multi-player Miserie
 
 **Score**
 - `id`: Primary key
@@ -251,6 +297,31 @@ De test suite bevat:
 
 ## 🔧 Configuratie
 
+### Contract Punten
+
+De applicatie ondersteunt configureerbare contractpunten via de web interface:
+- Toegankelijk via de setup pagina (voordat het spel start)
+- Configuratie wordt opgeslagen per game
+- Standaardwaarden kunnen worden gereset
+
+**Standaard waarden:**
+- Vraag met partner: 2 punten
+- Vraag alleen: 2 punten
+- Troel: 2 punten
+- Abondance: 5 punten
+- Solo: 13 punten
+- Miserie: 10 punten
+- Grote Miserie: 20 punten
+
+### Flask Secret Key
+
+Voor productie gebruik, stel een veilige secret key in via environment variable:
+```bash
+export SECRET_KEY="jouw-super-geheime-sleutel-hier"
+```
+
+Voor development wordt automatisch een standaard key gebruikt.
+
 ### Standaard Spelersnamen
 
 De applicatie gebruikt standaard de namen: **Jan, Piet, Joris, Korneel**
@@ -300,8 +371,11 @@ if __name__ == '__main__':
 ### Port Already in Use
 
 ```bash
-# Vind en stop het proces op poort 5000
-lsof -ti:5000 | xargs kill -9
+# Vind en stop het proces op poort 8080
+lsof -ti:8080 | xargs kill -9
+
+# Of gebruik een andere poort in app.py:
+app.run(debug=True, host='0.0.0.0', port=8080)
 
 # Start de applicatie opnieuw
 python3 app.py

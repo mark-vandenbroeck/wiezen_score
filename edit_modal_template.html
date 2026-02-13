@@ -1,0 +1,78 @@
+<!-- Edit Round Modal - Insert this after the Add Round Modal closing div -->
+<div id="editRoundModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeEditModal()">&times;</span>
+        <h2>Ronde Bewerken</h2>
+        <form id="editRoundForm" method="POST">
+            <div class="form-group">
+                <label for="edit-contract">Contract</label>
+                <select id="edit-contract" name="contract" required onchange="updateEditFormVisibility()">
+                    <option value="">Selecteer contract</option>
+                    <option value="Vraag">Vraag</option>
+                    <option value="Troel">Troel</option>
+                    <option value="Solo">Solo</option>
+                    <option value="Abondance">Abondance</option>
+                    <option value="Miserie">Miserie</option>
+                    <option value="Grote Miserie">Grote Miserie</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="edit-trump-group">
+                <label>Troef</label>
+                <div class="trump-options">
+                    <label class="trump-label">
+                        <input type="radio" name="trump_suit" value="Harten" required> ♥ Harten
+                    </label>
+                    <label class="trump-label">
+                        <input type="radio" name="trump_suit" value="Schoppen"> ♠ Schoppen
+                    </label>
+                    <label class="trump-label">
+                        <input type="radio" name="trump_suit" value="Ruiten"> ♦ Ruiten
+                    </label>
+                    <label class="trump-label">
+                        <input type="radio" name="trump_suit" value="Klaveren"> ♣ Klaveren
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="edit-main-player">Speler (Indien van toepassing)</label>
+                <select id="edit-main-player" name="main_player">
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="edit-partner-group">
+                <label for="edit-partner">Partner (Alleen bij Vraag)</label>
+                <select id="edit-partner" name="partner_id">
+                    <option value="">Geen (Alleenspel)</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Resultaat</label>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="result" value="Gewonnen" checked> Gewonnen
+                    </label>
+                    <label>
+                        <input type="radio" name="result" value="Verloren"> Verloren
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="edit-tricks">Extra Slagen / Details (Optioneel)</label>
+                <input type="number" id="edit-tricks" name="tricks" value="0" placeholder="0">
+                <small>Bv. aantal overslagen bij Vraag</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary full-width">Opslaan</button>
+        </form>
+    </div>
+</div>

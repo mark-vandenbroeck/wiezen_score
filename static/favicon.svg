@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Dark background -->
+  <rect width="100" height="100" fill="#1e1e1e" rx="15"/>
+  
+  <!-- Neon green spade symbol -->
+  <path d="M50 20 C50 20, 35 35, 35 50 C35 57, 40 62, 47 62 L47 75 C47 77, 45 80, 42 80 L58 80 C55 80, 53 77, 53 75 L53 62 C60 62, 65 57, 65 50 C65 35, 50 20, 50 20 Z" 
+        fill="#00e676" 
+        stroke="#00c853" 
+        stroke-width="1"/>
+  
+  <!-- Subtle glow effect -->
+  <path d="M50 20 C50 20, 35 35, 35 50 C35 57, 40 62, 47 62 L47 75 C47 77, 45 80, 42 80 L58 80 C55 80, 53 77, 53 75 L53 62 C60 62, 65 57, 65 50 C65 35, 50 20, 50 20 Z" 
+        fill="none" 
+        stroke="#00e676" 
+        stroke-width="2"
+        opacity="0.3"
+        filter="blur(2px)"/>
+</svg>

@@ -1,0 +1,25 @@
+<!-- Confirm Delete Modal -->
+<div id="confirmDeleteModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <span class="close" onclick="closeConfirmModal()">&times;</span>
+        <h2>Bevestiging</h2>
+        <p id="confirmMessage"></p>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+            <button type="button" class="btn" onclick="closeConfirmModal()"
+                style="background: #6c757d;">Annuleren</button>
+            <button type="button" class="btn btn-danger" id="confirmOkBtn">Verwijderen</button>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Modal -->
+<div id="alertModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <span class="close" onclick="closeAlertModal()">&times;</span>
+        <h2>Melding</h2>
+        <p id="alertMessage"></p>
+        <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+            <button type="button" class="btn" onclick="closeAlertModal()">OK</button>
+        </div>
+    </div>
+</div>
