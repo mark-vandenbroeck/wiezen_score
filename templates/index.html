@@ -36,10 +36,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <h3 style="margin: 0;">Laatste Rondes</h3>
             {% if rounds %}
-            <form action="{{ url_for('undo_round') }}" method="POST" style="margin: 0;"
-                onsubmit="return confirm('Weet je zeker dat je de laatste ronde ongedaan wilt maken? Deze actie kan niet ongedaan worden gemaakt.');">
-                <button type="submit" class="btn btn-warning">↶ Ongedaan Maken</button>
-            </form>
+            <button type="button" class="btn btn-warning" onclick="confirmUndo()">↶ Ongedaan Maken</button>
             {% endif %}
         </div>
         <table class="history-table">
@@ -661,6 +658,20 @@
     function clearEditTrumpValidity() {
         const trumpRadios = document.querySelectorAll('#editRoundModal input[name="trump_suit"]');
         trumpRadios.forEach(radio => radio.setCustomValidity(''));
+    }
+
+    // Undo last round with confirmation
+    function confirmUndo() {
+        const message = 'Weet je zeker dat je de laatste ronde ongedaan wilt maken? Deze actie kan niet ongedaan worden gemaakt.';
+
+        showConfirmModal(message, function () {
+            // Create and submit form to undo endpoint
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ url_for("undo_round") }}';
+            document.body.appendChild(form);
+            form.submit();
+        });
     }
 
 </script>
