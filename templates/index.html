@@ -33,7 +33,15 @@
 
     <!-- History Section -->
     <section class="history-section">
-        <h3>Laatste Rondes</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0;">Laatste Rondes</h3>
+            {% if rounds %}
+            <form action="{{ url_for('undo_round') }}" method="POST" style="margin: 0;"
+                onsubmit="return confirm('Weet je zeker dat je de laatste ronde ongedaan wilt maken? Deze actie kan niet ongedaan worden gemaakt.');">
+                <button type="submit" class="btn btn-warning">↶ Ongedaan Maken</button>
+            </form>
+            {% endif %}
+        </div>
         <table class="history-table">
             <thead>
                 <tr>
@@ -43,6 +51,7 @@
                     {% for player in players %}
                     <th>{{ player.name }}</th>
                     {% endfor %}
+                    <th>Acties</th>
                 </tr>
             </thead>
             <tbody>
@@ -86,6 +95,24 @@
                             {% endif %}
                     </td>
                     {% endfor %}
+                    <td class="action-buttons">
+                        <button class="btn-icon btn-edit" onclick="openEditModal({{ round.round_number }})"
+                            title="Bewerken">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path
+                                    d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708l-3-3zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207l6.5-6.5zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.499.499 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11l.178-.178z" />
+                            </svg>
+                        </button>
+                        <button class="btn-icon btn-delete" onclick="confirmDelete({{ round.round_number }})"
+                            title="Verwijderen">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path
+                                    d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                                <path fill-rule="evenodd"
+                                    d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                            </svg>
+                        </button>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -189,6 +216,115 @@
             <div class="form-group">
                 <label for="tricks">Extra Slagen / Details (Optioneel)</label>
                 <input type="number" id="tricks" name="tricks" value="0" placeholder="0">
+                <small>Bv. aantal overslagen bij Vraag</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary full-width">Opslaan</button>
+        </form>
+    </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div id="confirmDeleteModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <span class="close" onclick="closeConfirmModal()">&times;</span>
+        <h2>Bevestiging</h2>
+        <p id="confirmMessage" style="margin: 20px 0;"></p>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+            <button type="button" class="btn" onclick="closeConfirmModal()"
+                style="background: #6c757d;">Annuleren</button>
+            <button type="button" class="btn btn-danger" id="confirmOkBtn">Verwijderen</button>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Modal -->
+<div id="alertModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <span class="close" onclick="closeAlertModal()">&times;</span>
+        <h2>Melding</h2>
+        <p id="alertMessage" style="margin: 20px 0;"></p>
+        <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+            <button type="button" class="btn" onclick="closeAlertModal()">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Round Modal -->
+<div id="editRoundModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeEditModal()">&times;</span>
+        <h2>Ronde Bewerken</h2>
+        <form id="editRoundForm" method="POST">
+            <div class="form-group">
+                <label for="edit-contract">Contract</label>
+                <select id="edit-contract" name="contract" required onchange="updateEditFormVisibility()">
+                    <option value="">Selecteer contract</option>
+                    <option value="Vraag">Vraag</option>
+                    <option value="Abondance">Abondance</option>
+                    <option value="Miserie">Miserie</option>
+                    <option value="Grote Miserie">Grote Miserie</option>
+                    <option value="Troel">Troel</option>
+                    <option value="Solo">Solo</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="edit-trump-group">
+                <label>Troef</label>
+                <div class="trump-options">
+                    <label class="trump-label">
+                        <input type="radio" name="trump_suit" value="harten" onclick="clearEditTrumpValidity()"> ♥
+                        Harten
+                    </label>
+                    <label class="trump-label">
+                        <input type="radio" name="trump_suit" value="schoppen" onclick="clearEditTrumpValidity()"> ♠
+                        Schoppen
+                    </label>
+                    <label class="trump-label">
+                        <input type="radio" name="trump_suit" value="ruiten" onclick="clearEditTrumpValidity()"> ♦
+                        Ruiten
+                    </label>
+                    <label class="trump-label">
+                        <input type="radio" name="trump_suit" value="klaveren" onclick="clearEditTrumpValidity()"> ♣
+                        Klaveren
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="edit-main-player">Speler</label>
+                <select id="edit-main-player" name="main_player" required>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="edit-partner-group">
+                <label for="edit-partner">Partner (Alleen bij Vraag)</label>
+                <select id="edit-partner" name="partner_id">
+                    <option value="">Geen (Alleenspel)</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">{{ player.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Resultaat</label>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="result" value="Gewonnen" id="edit-result-won"> Gewonnen
+                    </label>
+                    <label>
+                        <input type="radio" name="result" value="Verloren" id="edit-result-lost"> Verloren
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="edit-tricks">Extra Slagen / Details (Optioneel)</label>
+                <input type="number" id="edit-tricks" name="tricks" value="0" placeholder="0">
                 <small>Bv. aantal overslagen bij Vraag</small>
             </div>
 
@@ -382,5 +518,150 @@
     }
 
     // Auto-remove main player from partner options? Optional enhancement.
+
+    // Custom modal functions
+    function showConfirmModal(message, onConfirm) {
+        const modal = document.getElementById('confirmDeleteModal');
+        const messageEl = document.getElementById('confirmMessage');
+        const okBtn = document.getElementById('confirmOkBtn');
+
+        messageEl.textContent = message;
+        modal.style.display = 'block';
+
+        // Remove old event listeners and add new one
+        const newOkBtn = okBtn.cloneNode(true);
+        okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+
+        newOkBtn.onclick = function () {
+            modal.style.display = 'none';
+            onConfirm();
+        };
+    }
+
+    function closeConfirmModal() {
+        document.getElementById('confirmDeleteModal').style.display = 'none';
+    }
+
+    function showAlertModal(message) {
+        const modal = document.getElementById('alertModal');
+        const messageEl = document.getElementById('alertMessage');
+
+        messageEl.textContent = message;
+        modal.style.display = 'block';
+    }
+
+    function closeAlertModal() {
+        document.getElementById('alertModal').style.display = 'none';
+    }
+
+    // Delete round confirmation
+    function confirmDelete(roundNumber) {
+        const message = `Weet je zeker dat je ronde #${roundNumber} wilt verwijderen? Alle scores worden opnieuw berekend.`;
+
+        showConfirmModal(message, function () {
+            const rounds = {{ rounds | tojson
+        }};
+    const round = rounds.find(r => r.round_number === roundNumber);
+    if (round) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/round/delete/${round.id}`;
+        document.body.appendChild(form);
+        form.submit();
+    }
+        });
+    }
+
+    // Edit modal functions
+    function openEditModal(roundNumber) {
+        const rounds = {{ rounds | tojson
+    }};
+    const round = rounds.find(r => r.round_number === roundNumber);
+
+    if (!round) {
+        showAlertModal('Ronde niet gevonden!');
+        return;
+    }
+
+    // Fetch round data from server to get complete details
+    fetch(`/round/edit/${round.id}`)
+        .then(response => response.json())
+        .then(data => {
+            // Set form action
+            document.getElementById('editRoundForm').action = `/round/update/${data.id}`;
+
+            // Pre-fill contract
+            document.getElementById('edit-contract').value = data.contract;
+
+            // Pre-fill trump suit if applicable
+            if (data.trump_suit) {
+                const trumpRadio = document.querySelector(`#editRoundModal input[name="trump_suit"][value="${data.trump_suit}"]`);
+                if (trumpRadio) trumpRadio.checked = true;
+            }
+
+            // Pre-fill main player
+            document.getElementById('edit-main-player').value = data.main_player_id;
+
+            // Pre-fill partner
+            document.getElementById('edit-partner').value = data.partner_id || '';
+
+            // Pre-fill result
+            if (data.result === 'Gewonnen') {
+                document.getElementById('edit-result-won').checked = true;
+            } else {
+                document.getElementById('edit-result-lost').checked = true;
+            }
+
+            // Pre-fill tricks
+            document.getElementById('edit-tricks').value = data.tricks || 0;
+
+            // Update form visibility based on contract
+            updateEditFormVisibility();
+
+            // Show modal
+            document.getElementById('editRoundModal').style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Error fetching round data:', error);
+            showAlertModal('Fout bij het ophalen van ronde gegevens.');
+        });
+    }
+
+    function closeEditModal() {
+        document.getElementById('editRoundModal').style.display = 'none';
+    }
+
+    function updateEditFormVisibility() {
+        const contract = document.getElementById('edit-contract').value;
+        const trumpGroup = document.getElementById('edit-trump-group');
+        const partnerGroup = document.getElementById('edit-partner-group');
+        const trumpRadios = document.querySelectorAll('#editRoundModal input[name="trump_suit"]');
+
+        // Show/hide trump based on contract
+        if (['Vraag', 'Abondance', 'Troel', 'Solo'].includes(contract)) {
+            trumpGroup.style.display = 'block';
+            trumpRadios.forEach(radio => radio.required = true);
+        } else {
+            trumpGroup.style.display = 'none';
+            trumpRadios.forEach(radio => {
+                radio.required = false;
+                radio.checked = false;
+            });
+        }
+
+        // Show/hide partner based on contract (only for Vraag)
+        if (contract === 'Vraag') {
+            partnerGroup.style.display = 'block';
+        } else {
+            partnerGroup.style.display = 'none';
+            document.getElementById('edit-partner').value = '';
+        }
+    }
+
+    function clearEditTrumpValidity() {
+        const trumpRadios = document.querySelectorAll('#editRoundModal input[name="trump_suit"]');
+        trumpRadios.forEach(radio => radio.setCustomValidity(''));
+    }
+
 </script>
 {% endblock %}

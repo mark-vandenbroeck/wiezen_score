@@ -38,6 +38,10 @@ De applicatie ondersteunt alle standaard Wiezen contracten:
 - **Responsive design**: Werkt op desktop en tablet
 - **Nederlandse interface**: Volledig in het Nederlands
 - **Validatie**: Uitgebreide invoervalidatie met Nederlandse foutmeldingen
+- **Custom modals**: Betrouwbare dialoogvensters voor bewerken en verwijderen
+- **Edit functionaliteit**: Rondes kunnen achteraf worden bewerkt met automatische score herberekening
+- **Delete functionaliteit**: Rondes kunnen worden verwijderd met bevestiging
+
 
 ## 🚀 Installatie
 
@@ -85,6 +89,21 @@ De applicatie ondersteunt alle standaard Wiezen contracten:
 6. Selecteer het **Resultaat** (Gewonnen/Verloren)
 7. Voer eventueel **Extra Slagen** in
 8. Klik op "Opslaan"
+
+### Een ronde bewerken
+
+1. Klik op het **potlood icoon** (✏️) bij de ronde die je wilt bewerken
+2. De edit modal opent met alle huidige gegevens vooraf ingevuld
+3. Wijzig de gewenste velden (contract, troef, speler, resultaat, etc.)
+4. Klik op "Opslaan"
+5. De scores worden automatisch herberekend vanaf deze ronde
+
+### Een ronde verwijderen
+
+1. Klik op het **prullenbak icoon** (🗑️) bij de ronde die je wilt verwijderen
+2. Bevestig de verwijdering in het dialoogvenster
+3. De ronde wordt verwijderd en alle scores worden opnieuw berekend
+
 
 ### Speciale gevallen
 
