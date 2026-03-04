@@ -87,7 +87,7 @@ Met Docker Compose kun je de applicatie direct opstarten, en de data blijft beho
 1. **Start de applicatie met Docker Compose**
    In de hoofdmap van het project, run:
    ```bash
-   docker-compose up -d
+   docker compose up -d --build
    ```
 
 2. **Open in browser**
