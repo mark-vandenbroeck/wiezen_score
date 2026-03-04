@@ -52,11 +52,13 @@ De applicatie ondersteunt alle standaard Wiezen contracten:
 
 ## 🚀 Installatie
 
-### Vereisten
+### Lokale Installatie (Zonder Docker)
+
+#### Vereisten
 - Python 3.7 of hoger
 - pip (Python package manager)
 
-### Stappen
+#### Stappen
 
 1. **Clone of download het project**
    ```bash
@@ -77,6 +79,24 @@ De applicatie ondersteunt alle standaard Wiezen contracten:
    ```
    http://localhost:8080
    ```
+
+### 🐳 Installatie met Docker (Aanbevolen)
+
+Met Docker Compose kun je de applicatie direct opstarten, en de data blijft behouden op je eigen machine.
+
+1. **Start de applicatie met Docker Compose**
+   In de hoofdmap van het project, run:
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Open in browser**
+   ```
+   http://localhost:8080
+   ```
+
+*Let op: de database (`wiezen.db`) wordt automatisch opgeslagen in de map waarin je Docker Compose uitvoert, zodat geen spelgegevens verloren gaan.*
+
 
 ## 📖 Gebruik
 
